@@ -34,8 +34,24 @@ public class CracProcess {
 
     public void waitForCheckpointed() throws InterruptedException {
         if (builder.engine == null || builder.engine == CracEngine.CRIU) {
-            assertEquals(137, process.waitFor(), "Checkpointed process was not killed as expected.");
-            // TODO: we could check that "CR: Checkpoint" was written out
+            int exitValue = -1;
+            try {
+                exitValue = process.waitFor();
+                assertEquals(137, exitValue, "Checkpointed process was not killed as expected.");
+                // TODO: we could check that "CR: Checkpoint" was written out
+            } catch (Exception ex) {
+                if (builder.captureOutput) {
+                    try {
+                        builder.log("Checkpointed process %d completed with exit value %d: %n%s",
+                                process.pid(),
+                                exitValue,
+                                new OutputAnalyzer(process).getOutput());
+                    } catch (IOException e) {
+                        builder.log("Can't get process log due to " + e);
+                    }
+                }
+                throw ex;
+            }
         } else {
             fail("With engine " + builder.engine.engine + " use the async version.");
         }
@@ -78,10 +94,25 @@ public class CracProcess {
     }
 
     public CracProcess waitForSuccess() throws InterruptedException {
-        int exitValue = process.waitFor();
-        assertEquals(0, exitValue, "Process returned unexpected exit code: " + exitValue);
-        builder.log("Process %d completed with exit value %d%n", process.pid(), exitValue);
-        return this;
+        int exitValue = -1;
+        try {
+            exitValue = process.waitFor();
+            assertEquals(0, exitValue, "Process returned unexpected exit code: " + exitValue);
+            builder.log("Process %d completed with exit value %d%n", process.pid(), exitValue);
+            return this;
+        } catch (Exception ex) {
+            if (builder.captureOutput) {
+                try {
+                    builder.log("Process %d completed with exit value %d: %n%s",
+                            process.pid(),
+                            exitValue,
+                            new OutputAnalyzer(process).getOutput());
+                } catch (IOException e) {
+                    builder.log("Can't get process log due to " + e);
+                }
+            }
+            throw ex;
+        }
     }
 
     public OutputAnalyzer outputAnalyzer() throws IOException {
